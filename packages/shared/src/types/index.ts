@@ -40,7 +40,7 @@ export interface Session {
   title: string | null;
   repoOwner: string;
   repoName: string;
-  repoDefaultBranch: string;
+  baseBranch: string;
   branchName: string | null;
   baseSha: string | null;
   currentSha: string | null;
@@ -260,6 +260,7 @@ export interface CreateSessionRequest {
   title?: string;
   model?: string;
   reasoningEffort?: string;
+  branch?: string;
 }
 
 export interface CreateSessionResponse {

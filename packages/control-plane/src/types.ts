@@ -260,6 +260,7 @@ export interface SessionState {
   repoOwner: string;
   repoName: string;
   branchName: string | null;
+  baseBranch: string | null;
   status: SessionStatus;
   sandboxStatus: SandboxStatus;
   messageCount: number;
@@ -299,6 +300,7 @@ export interface CreateSessionRequest {
   title?: string;
   model?: string; // LLM model to use (e.g., "anthropic/claude-haiku-4-5", "anthropic/claude-sonnet-4-5")
   reasoningEffort?: string; // Reasoning effort level (e.g., "high", "max")
+  branch?: string; // Git branch to work on (defaults to repo's default branch)
 }
 
 export interface CreateSessionResponse {
@@ -311,7 +313,7 @@ export interface SessionResponse {
   title: string | null;
   repoOwner: string;
   repoName: string;
-  repoDefaultBranch: string;
+  baseBranch: string;
   branchName: string | null;
   baseSha: string | null;
   currentSha: string | null;
