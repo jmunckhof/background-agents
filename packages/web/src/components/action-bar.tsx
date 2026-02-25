@@ -112,7 +112,11 @@ export function ActionBar({
       <div className="relative shrink-0">
         <button
           onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className="flex items-center justify-center w-8 h-8 text-muted-foreground hover:text-foreground border border-border hover:bg-muted transition-colors"
+          className={buttonVariants({
+            variant: "outline",
+            size: "sm",
+            className: "flex shrink-0 items-center justify-center !px-2",
+          })}
         >
           <MoreIcon className="w-4 h-4" />
         </button>
