@@ -10,7 +10,7 @@ import {
   LinkIcon,
   GitHubIcon,
 } from "@/components/ui/icons";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 interface ActionBarProps {
   sessionId: string;
@@ -110,16 +110,14 @@ export function ActionBar({
 
       {/* More menu */}
       <div className="relative shrink-0">
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className={buttonVariants({
-            variant: "outline",
-            size: "sm",
-            className: "flex shrink-0 items-center justify-center !px-2 h-full",
-          })}
+          className="flex shrink-0 items-center justify-center !px-2 h-full"
         >
           <MoreIcon className="w-4 h-4" />
-        </button>
+        </Button>
 
         {isMenuOpen && (
           <>
