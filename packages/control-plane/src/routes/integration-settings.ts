@@ -360,6 +360,27 @@ async function handleGetResolvedConfig(
     });
   }
 
+  if (id === "teams") {
+    const teamsSettings = settings as TeamsBotSettings;
+    const teamsReasoningEffort =
+      teamsSettings.model &&
+      teamsSettings.reasoningEffort &&
+      !isValidReasoningEffort(teamsSettings.model, teamsSettings.reasoningEffort)
+        ? null
+        : (teamsSettings.reasoningEffort ?? null);
+
+    return json({
+      integrationId: id,
+      repo,
+      config: {
+        model: teamsSettings.model ?? null,
+        reasoningEffort: teamsReasoningEffort,
+        typingMode: teamsSettings.typingMode ?? null,
+        enabledRepos,
+      },
+    });
+  }
+
   return error(`Unsupported integration: ${id}`, 400);
 }
 
