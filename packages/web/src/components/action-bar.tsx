@@ -99,14 +99,16 @@ export function ActionBar({
       )}
 
       {/* Archive/Unarchive */}
-      <button
+      <Button
+        variant="outline"
+        size="sm"
         onClick={handleArchiveToggle}
         disabled={isArchiving}
-        className={`${pillButtonClass} disabled:opacity-50`}
+        className="flex shrink-0 items-center gap-1.5 whitespace-nowrap disabled:opacity-50"
       >
         <ArchiveIcon className="w-4 h-4" />
         <span>{isArchived ? "Unarchive" : "Archive"}</span>
-      </button>
+      </Button>
 
       {/* More menu */}
       <div className="relative shrink-0">
