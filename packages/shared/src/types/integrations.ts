@@ -1,6 +1,6 @@
 // Integration settings types
 
-export type IntegrationId = "github" | "linear";
+export type IntegrationId = "github" | "linear" | "teams";
 
 /** Enforces the common shape for all integration configurations. */
 export interface IntegrationEntry<TRepo extends object = Record<string, unknown>> {
@@ -28,15 +28,23 @@ export interface LinearBotSettings {
   emitToolProgressActivities?: boolean;
 }
 
+/** Overridable behavior settings for the Teams bot. Used at both global (defaults) and per-repo (overrides) levels. */
+export interface TeamsBotSettings {
+  model?: string;
+  reasoningEffort?: string;
+}
+
 /** Maps each integration ID to its global and per-repo settings types. */
 export interface IntegrationSettingsMap {
   github: IntegrationEntry<GitHubBotSettings>;
   linear: IntegrationEntry<LinearBotSettings>;
+  teams: IntegrationEntry<TeamsBotSettings>;
 }
 
 /** Derived type for the GitHub bot global config. */
 export type GitHubGlobalConfig = IntegrationSettingsMap["github"]["global"];
 export type LinearGlobalConfig = IntegrationSettingsMap["linear"]["global"];
+export type TeamsGlobalConfig = IntegrationSettingsMap["teams"]["global"];
 
 export const INTEGRATION_DEFINITIONS: {
   id: IntegrationId;
@@ -52,5 +60,10 @@ export const INTEGRATION_DEFINITIONS: {
     id: "linear",
     name: "Linear Agent",
     description: "Issue-driven coding sessions from Linear agent mentions",
+  },
+  {
+    id: "teams",
+    name: "Microsoft Teams Bot",
+    description: "Channel bot with threaded coding sessions",
   },
 ];

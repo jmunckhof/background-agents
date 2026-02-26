@@ -193,6 +193,34 @@ variable "linear_api_key" {
 }
 
 # =============================================================================
+# Microsoft Teams Bot Configuration
+# =============================================================================
+
+variable "enable_teams_bot" {
+  description = "Enable the Teams bot worker. Requires microsoft_app_id and microsoft_app_password."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = var.enable_teams_bot == false || (length(var.microsoft_app_id) > 0 && length(var.microsoft_app_password) > 0)
+    error_message = "When enable_teams_bot is true, microsoft_app_id and microsoft_app_password must be non-empty."
+  }
+}
+
+variable "microsoft_app_id" {
+  description = "Microsoft Bot Framework App ID (from Azure Bot registration)"
+  type        = string
+  default     = ""
+}
+
+variable "microsoft_app_password" {
+  description = "Microsoft Bot Framework App Password (client secret)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+# =============================================================================
 # API Keys
 # =============================================================================
 
