@@ -104,10 +104,6 @@ export interface ClassificationResult {
  * Callback context passed with prompts for follow-up notifications.
  */
 export type { TeamsCallbackContext, CallbackContext } from "@open-inspect/shared";
-import type { TeamsCallbackContext } from "@open-inspect/shared";
-
-// Keep backward-compatible alias
-export type TeamsBotCallbackContext = TeamsCallbackContext;
 
 /**
  * Thread-to-session mapping stored in KV for conversation continuity.

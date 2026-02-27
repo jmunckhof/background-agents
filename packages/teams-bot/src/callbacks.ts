@@ -4,6 +4,7 @@
 
 import { Hono } from "hono";
 import type { Env, CompletionCallback } from "./types";
+import { timingSafeEqual } from "@open-inspect/shared";
 import { extractAgentResponse } from "./completion/extractor";
 import { buildCompletionText } from "./completion/cards";
 import { sendReply, sendTypingIndicator } from "./utils/teams-client";
@@ -32,7 +33,7 @@ async function verifyCallbackSignature(
   const expectedHex = Array.from(new Uint8Array(expectedSig))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
-  return signature === expectedHex;
+  return timingSafeEqual(signature, expectedHex);
 }
 
 /**

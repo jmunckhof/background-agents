@@ -9,7 +9,7 @@ import { Hono } from "hono";
 import type { Env, RepoConfig, Activity, ThreadSession, UserPreferences } from "./types";
 import type { TeamsCallbackContext, CallbackContext } from "@open-inspect/shared";
 import { validateBotFrameworkToken } from "./utils/jwt-validator";
-import { sendReply, sendTypingIndicator } from "./utils/teams-client";
+import { sendReply } from "./utils/teams-client";
 import { createClassifier } from "./classifier";
 import { getAvailableRepos } from "./classifier/repos";
 import { callbacksRouter } from "./callbacks";
@@ -391,16 +391,6 @@ function getTeamsUserId(activity: Activity): string {
   return activity.from.aadObjectId || activity.from.id;
 }
 
-/** Whether to show a typing indicator given the configured mode and trigger point. */
-function shouldShowTyping(
-  mode: string | null | undefined,
-  trigger: "message" | "response"
-): boolean {
-  if (mode === "never") return false;
-  // Default is "response" — only show typing when generating the completion response
-  return trigger === "response";
-}
-
 // ─── Integration Settings ─────────────────────────────────────────────────────
 
 interface TeamsIntegrationConfig {
@@ -459,18 +449,6 @@ async function startSessionAndSendPrompt(
   // Model priority: user prefs > integration settings > DEFAULT_MODEL
   const userPrefs = await getUserPreferences(env, userId);
   const integrationConfig = await getTeamsIntegrationConfig(env, repo.fullName, traceId);
-
-  // Show typing indicator for new sessions (after we have the config)
-  if (shouldShowTyping(integrationConfig.typingMode, "message")) {
-    sendTypingIndicator(
-      activity.serviceUrl,
-      conversationId,
-      replyActivityId,
-      env.MICROSOFT_APP_ID,
-      env.MICROSOFT_APP_PASSWORD,
-      env.MICROSOFT_TENANT_ID
-    ).catch(() => {});
-  }
 
   const fallback = integrationConfig.model || env.DEFAULT_MODEL || DEFAULT_MODEL;
   const model = getValidModelOrDefault(userPrefs?.model ?? fallback);
@@ -629,17 +607,6 @@ async function handleMessage(activity: Activity, env: Env, traceId: string): Pro
         await clearThreadSession(env, conversationId, sessionKey);
         // Fall through to create a new session
       } else {
-        if (shouldShowTyping(existingSession.typingMode, "message")) {
-          sendTypingIndicator(
-            activity.serviceUrl,
-            conversationId,
-            replyActivityId,
-            env.MICROSOFT_APP_ID,
-            env.MICROSOFT_APP_PASSWORD,
-            env.MICROSOFT_TENANT_ID
-          ).catch(() => {});
-        }
-
         const callbackContext: TeamsCallbackContext = {
           source: "teams",
           conversationId,

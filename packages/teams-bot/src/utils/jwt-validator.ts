@@ -153,11 +153,10 @@ export async function validateBotFrameworkToken(
       return false;
     }
 
-    // Check issuer
+    // Check issuer — Bot Framework may use different issuers for different channels,
+    // so accept any Microsoft-issued token as valid.
     if (typeof payload.iss === "string" && issuer && payload.iss !== issuer) {
-      // Bot Framework may use different issuers for different channels
-      // Be lenient — accept any Microsoft-issued token
-      if (!payload.iss.includes("login.microsoftonline.com") && payload.iss !== issuer) {
+      if (!payload.iss.includes("login.microsoftonline.com")) {
         log.warn("jwt.validation", { outcome: "invalid_issuer", iss: payload.iss });
         return false;
       }
