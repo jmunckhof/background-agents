@@ -30,10 +30,12 @@ function statusBadgeVariant(status: string) {
 
 export function ChildSessionsSection({ sessionId }: ChildSessionsSectionProps) {
   const { data } = useSWR<{ children: SessionItem[] }>(`/api/sessions/${sessionId}/children`, {
+    // Primary refresh is event-driven via WebSocket child_session_update → SWR mutate().
+    // This is a safety-net fallback for missed WS messages during reconnections.
     refreshInterval: (latestData) => {
       if (!latestData?.children?.length) return 0;
       const hasActiveChild = latestData.children.some((c) => !TERMINAL_STATUSES.has(c.status));
-      return hasActiveChild ? 10_000 : 0;
+      return hasActiveChild ? 30_000 : 0;
     },
   });
 
@@ -50,15 +52,17 @@ export function ChildSessionsSection({ sessionId }: ChildSessionsSectionProps) {
             className="block p-2 hover:bg-muted transition-colors rounded"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm truncate">
-                {child.title || `${child.repoOwner}/${child.repoName}`}
-              </span>
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {formatRelativeTime(child.updatedAt || child.createdAt)}
+                </span>
+                <span className="text-sm truncate">
+                  {child.title || `${child.repoOwner}/${child.repoName}`}
+                </span>
+              </div>
               <Badge variant={statusBadgeVariant(child.status)} className="shrink-0">
                 {child.status}
               </Badge>
-            </div>
-            <div className="text-xs text-muted-foreground mt-0.5">
-              {formatRelativeTime(child.updatedAt || child.createdAt)}
             </div>
           </Link>
         ))}
