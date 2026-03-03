@@ -387,52 +387,37 @@ function GlobalSettingsSection({
         </label>
 
         {updateIssueStatus && (
-          <div className="grid sm:grid-cols-3 gap-2">
-            <label className="text-sm">
-              <span className="block text-muted-foreground mb-1">In Progress state</span>
-              <input
-                type="text"
-                value={inProgressStateName}
-                onChange={(e) => {
-                  setInProgressStateName(e.target.value);
-                  setDirty(true);
-                  setError("");
-                  setSuccess("");
-                }}
-                placeholder="In Progress"
-                className="w-full px-2 py-1 text-sm border border-border rounded-sm bg-background"
-              />
-            </label>
-            <label className="text-sm">
-              <span className="block text-muted-foreground mb-1">Completed state</span>
-              <input
-                type="text"
-                value={completedStateName}
-                onChange={(e) => {
-                  setCompletedStateName(e.target.value);
-                  setDirty(true);
-                  setError("");
-                  setSuccess("");
-                }}
-                placeholder="In Review"
-                className="w-full px-2 py-1 text-sm border border-border rounded-sm bg-background"
-              />
-            </label>
-            <label className="text-sm">
-              <span className="block text-muted-foreground mb-1">Cancelled state</span>
-              <input
-                type="text"
-                value={cancelledStateName}
-                onChange={(e) => {
-                  setCancelledStateName(e.target.value);
-                  setDirty(true);
-                  setError("");
-                  setSuccess("");
-                }}
-                placeholder="Leave empty to skip"
-                className="w-full px-2 py-1 text-sm border border-border rounded-sm bg-background"
-              />
-            </label>
+          <div className="space-y-2">
+            <StatusMappingRow
+              label="In Progress"
+              value={inProgressStateName}
+              onChange={(v) => {
+                setInProgressStateName(v);
+                setDirty(true);
+                setError("");
+                setSuccess("");
+              }}
+            />
+            <StatusMappingRow
+              label="Completed"
+              value={completedStateName}
+              onChange={(v) => {
+                setCompletedStateName(v);
+                setDirty(true);
+                setError("");
+                setSuccess("");
+              }}
+            />
+            <StatusMappingRow
+              label="Cancelled"
+              value={cancelledStateName}
+              onChange={(v) => {
+                setCancelledStateName(v);
+                setDirty(true);
+                setError("");
+                setSuccess("");
+              }}
+            />
           </div>
         )}
       </div>
@@ -812,46 +797,34 @@ function RepoOverrideRow({
       </label>
 
       {updateIssueStatus && (
-        <div className="grid sm:grid-cols-3 gap-2">
-          <label className="text-sm">
-            <span className="block text-muted-foreground mb-1">In Progress state</span>
-            <input
-              type="text"
-              value={inProgressStateName}
-              onChange={(e) => {
-                setInProgressStateName(e.target.value);
-                setDirty(true);
-              }}
-              placeholder="In Progress"
-              className="w-full px-2 py-1 text-sm border border-border rounded-sm bg-background"
-            />
-          </label>
-          <label className="text-sm">
-            <span className="block text-muted-foreground mb-1">Completed state</span>
-            <input
-              type="text"
-              value={completedStateName}
-              onChange={(e) => {
-                setCompletedStateName(e.target.value);
-                setDirty(true);
-              }}
-              placeholder="In Review"
-              className="w-full px-2 py-1 text-sm border border-border rounded-sm bg-background"
-            />
-          </label>
-          <label className="text-sm">
-            <span className="block text-muted-foreground mb-1">Cancelled state</span>
-            <input
-              type="text"
-              value={cancelledStateName}
-              onChange={(e) => {
-                setCancelledStateName(e.target.value);
-                setDirty(true);
-              }}
-              placeholder="Leave empty to skip"
-              className="w-full px-2 py-1 text-sm border border-border rounded-sm bg-background"
-            />
-          </label>
+        <div className="space-y-2">
+          <StatusMappingRow
+            label="In Progress"
+            value={inProgressStateName}
+            density="compact"
+            onChange={(v) => {
+              setInProgressStateName(v);
+              setDirty(true);
+            }}
+          />
+          <StatusMappingRow
+            label="Completed"
+            value={completedStateName}
+            density="compact"
+            onChange={(v) => {
+              setCompletedStateName(v);
+              setDirty(true);
+            }}
+          />
+          <StatusMappingRow
+            label="Cancelled"
+            value={cancelledStateName}
+            density="compact"
+            onChange={(v) => {
+              setCancelledStateName(v);
+              setDirty(true);
+            }}
+          />
         </div>
       )}
 
@@ -885,6 +858,51 @@ function Section({
       <p className="text-sm text-muted-foreground mb-4">{description}</p>
       {children}
     </section>
+  );
+}
+
+const LINEAR_STATE_OPTIONS = [
+  "Triage",
+  "Backlog",
+  "Todo",
+  "In Progress",
+  "In Review",
+  "Done",
+  "Cancelled",
+];
+
+function StatusMappingRow({
+  label,
+  value,
+  onChange,
+  density,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  density?: "compact";
+}) {
+  const py = density === "compact" ? "py-1" : "py-2";
+
+  return (
+    <div
+      className={`flex items-center justify-between gap-3 px-3 ${py} border border-border rounded-sm text-sm`}
+    >
+      <span className="text-foreground font-medium shrink-0">{label}</span>
+      <Select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        density={density ?? "default"}
+        className="w-48"
+      >
+        <option value="">Don&apos;t update</option>
+        {LINEAR_STATE_OPTIONS.map((name) => (
+          <option key={name} value={name}>
+            {name}
+          </option>
+        ))}
+      </Select>
+    </div>
   );
 }
 
