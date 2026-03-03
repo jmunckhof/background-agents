@@ -1,3 +1,5 @@
+import type { SessionStatus, SpawnSource } from "@open-inspect/shared";
+
 export interface SessionEntry {
   id: string;
   title: string | null;
@@ -6,9 +8,9 @@ export interface SessionEntry {
   model: string;
   reasoningEffort: string | null;
   baseBranch: string | null;
-  status: string;
+  status: SessionStatus;
   parentSessionId?: string | null;
-  spawnSource?: "user" | "agent";
+  spawnSource?: SpawnSource;
   spawnDepth?: number;
   createdAt: number;
   updatedAt: number;
@@ -22,17 +24,17 @@ interface SessionRow {
   model: string;
   reasoning_effort: string | null;
   base_branch: string | null;
-  status: string;
+  status: SessionStatus;
   parent_session_id: string | null;
-  spawn_source: "user" | "agent";
+  spawn_source: SpawnSource;
   spawn_depth: number;
   created_at: number;
   updated_at: number;
 }
 
 export interface ListSessionsOptions {
-  status?: string;
-  excludeStatus?: string;
+  status?: SessionStatus;
+  excludeStatus?: SessionStatus;
   repoOwner?: string;
   repoName?: string;
   limit?: number;
@@ -150,7 +152,7 @@ export class SessionIndexStore {
     };
   }
 
-  async updateStatus(id: string, status: string, updatedAt = Date.now()): Promise<boolean> {
+  async updateStatus(id: string, status: SessionStatus, updatedAt = Date.now()): Promise<boolean> {
     // Protect against out-of-order async writes by only applying monotonic updated_at values.
     const result = await this.db
       .prepare("UPDATE sessions SET status = ?, updated_at = ? WHERE id = ? AND updated_at <= ?")
