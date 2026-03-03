@@ -13,6 +13,7 @@ vi.mock("../src/github-auth", () => ({
   generateInstallationToken: vi.fn().mockResolvedValue("test-installation-token"),
   postReaction: vi.fn().mockResolvedValue(true),
   checkSenderPermission: vi.fn().mockResolvedValue({ hasPermission: true }),
+  fetchPullRequestHeadRef: vi.fn().mockResolvedValue("feature/cache"),
 }));
 
 vi.mock("../src/utils/internal", () => ({
@@ -47,7 +48,12 @@ import {
   handleIssueComment,
   handleReviewComment,
 } from "../src/handlers";
-import { generateInstallationToken, postReaction, checkSenderPermission } from "../src/github-auth";
+import {
+  generateInstallationToken,
+  postReaction,
+  checkSenderPermission,
+  fetchPullRequestHeadRef,
+} from "../src/github-auth";
 import { getGitHubConfig } from "../src/utils/integration-config";
 
 function createMockLogger(): Logger {
@@ -164,6 +170,7 @@ beforeEach(() => {
   vi.mocked(generateInstallationToken).mockResolvedValue("test-installation-token");
   vi.mocked(postReaction).mockResolvedValue(true);
   vi.mocked(checkSenderPermission).mockResolvedValue({ hasPermission: true });
+  vi.mocked(fetchPullRequestHeadRef).mockResolvedValue("feature/cache");
   vi.mocked(getGitHubConfig).mockResolvedValue({ ...defaultConfig });
 });
 
@@ -194,6 +201,7 @@ describe("handlePullRequestOpened", () => {
     expect(sessionBody.repoOwner).toBe("acme");
     expect(sessionBody.repoName).toBe("widgets");
     expect(sessionBody.title).toContain("Review PR #42");
+    expect(sessionBody.branch).toBe("feature/cache");
 
     const promptBody = JSON.parse(cpFetch.mock.calls[1][1].body);
     expect(promptBody.source).toBe("github");
@@ -360,6 +368,7 @@ describe("handleReviewRequested", () => {
     expect(sessionBody.repoOwner).toBe("acme");
     expect(sessionBody.repoName).toBe("widgets");
     expect(sessionBody.title).toContain("Review PR #42");
+    expect(sessionBody.branch).toBe("feature/cache");
 
     // Verify prompt sending
     const promptCall = cpFetch.mock.calls[1];
@@ -451,6 +460,15 @@ describe("handleIssueComment", () => {
     const cpFetch = getControlPlaneFetch(env);
     expect(cpFetch).toHaveBeenCalledTimes(2);
 
+    const sessionBody = JSON.parse(cpFetch.mock.calls[0][1].body);
+    expect(sessionBody.branch).toBe("feature/cache");
+    expect(fetchPullRequestHeadRef).toHaveBeenCalledWith(
+      "test-installation-token",
+      "acme",
+      "widgets",
+      42
+    );
+
     const promptBody = JSON.parse(cpFetch.mock.calls[1][1].body);
     expect(promptBody.content).toContain("please fix the error handling");
     expect(promptBody.content).not.toContain("@test-bot[bot]");
@@ -537,6 +555,10 @@ describe("handleReviewComment", () => {
     );
 
     const cpFetch = getControlPlaneFetch(env);
+
+    const sessionBody = JSON.parse(cpFetch.mock.calls[0][1].body);
+    expect(sessionBody.branch).toBe("feature/cache");
+
     const promptBody = JSON.parse(cpFetch.mock.calls[1][1].body);
     expect(promptBody.content).toContain("src/cache.ts");
     expect(promptBody.content).toContain("const cache = new Map()");

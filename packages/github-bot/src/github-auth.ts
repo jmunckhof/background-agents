@@ -122,6 +122,32 @@ export async function checkSenderPermission(
   }
 }
 
+export async function fetchPullRequestHeadRef(
+  token: string,
+  owner: string,
+  repo: string,
+  pullNumber: number
+): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${pullNumber}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+          "User-Agent": "Open-Inspect",
+        },
+      }
+    );
+    if (!response.ok) return null;
+    const data = (await response.json()) as { head: { ref: string } };
+    return data.head.ref;
+  } catch {
+    return null;
+  }
+}
+
 export async function postReaction(token: string, url: string, content: string): Promise<boolean> {
   try {
     const response = await fetch(url, {

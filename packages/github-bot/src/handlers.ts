@@ -6,7 +6,12 @@ import type {
   ReviewCommentPayload,
 } from "./types";
 import type { Logger } from "./logger";
-import { generateInstallationToken, postReaction, checkSenderPermission } from "./github-auth";
+import {
+  generateInstallationToken,
+  postReaction,
+  checkSenderPermission,
+  fetchPullRequestHeadRef,
+} from "./github-auth";
 import { buildCodeReviewPrompt, buildCommentActionPrompt } from "./prompts";
 import { generateInternalToken } from "./utils/internal";
 import { getGitHubConfig, type ResolvedGitHubConfig } from "./utils/integration-config";
@@ -33,6 +38,7 @@ async function createSession(
     title: string;
     model: string;
     reasoningEffort?: string | null;
+    branch?: string;
   }
 ): Promise<string> {
   const body: Record<string, unknown> = {
@@ -43,6 +49,9 @@ async function createSession(
   };
   if (params.reasoningEffort) {
     body.reasoningEffort = params.reasoningEffort;
+  }
+  if (params.branch) {
+    body.branch = params.branch;
   }
   const response = await controlPlane.fetch("https://internal/sessions", {
     method: "POST",
@@ -206,6 +215,7 @@ export async function handleReviewRequested(
     title: `GitHub: Review PR #${pr.number}`,
     model: config.model,
     reasoningEffort: config.reasoningEffort,
+    branch: pr.head.ref,
   });
   log.info("session.created", { ...meta, session_id: sessionId, action: "review" });
 
@@ -302,6 +312,7 @@ export async function handlePullRequestOpened(
     title: `GitHub: Review PR #${pr.number}`,
     model: config.model,
     reasoningEffort: config.reasoningEffort,
+    branch: pr.head.ref,
   });
   log.info("session.created", { ...meta, session_id: sessionId, action: "auto_review" });
 
@@ -398,12 +409,15 @@ export async function handleIssueComment(
     meta
   );
 
+  const headRef = await fetchPullRequestHeadRef(ghToken, owner, repoName, issue.number);
+
   const sessionId = await createSession(env.CONTROL_PLANE, headers, {
     repoOwner: owner,
     repoName,
     title: `GitHub: PR #${issue.number} comment`,
     model: config.model,
     reasoningEffort: config.reasoningEffort,
+    branch: headRef ?? undefined,
   });
   log.info("session.created", { ...meta, session_id: sessionId, action: "comment" });
 
@@ -499,6 +513,7 @@ export async function handleReviewComment(
     title: `GitHub: PR #${pr.number} review comment`,
     model: config.model,
     reasoningEffort: config.reasoningEffort,
+    branch: pr.head.ref,
   });
   log.info("session.created", { ...meta, session_id: sessionId, action: "review_comment" });
 
