@@ -215,6 +215,7 @@ jobs:
           TF_VAR_microsoft_app_password: ${{ secrets.MICROSOFT_APP_PASSWORD }}
           TF_VAR_microsoft_tenant_id: ${{ secrets.MICROSOFT_TENANT_ID }}
           TF_VAR_web_platform: "${{ secrets.WEB_PLATFORM || 'vercel' }}"
+          TF_VAR_enable_durable_object_bindings: "${{ secrets.ENABLE_DURABLE_OBJECT_BINDINGS || 'true' }}"
 
       - name: Post Plan Results
         uses: actions/github-script@v7
@@ -343,6 +344,7 @@ jobs:
           TF_VAR_microsoft_app_password: ${{ secrets.MICROSOFT_APP_PASSWORD }}
           TF_VAR_microsoft_tenant_id: ${{ secrets.MICROSOFT_TENANT_ID }}
           TF_VAR_web_platform: "${{ secrets.WEB_PLATFORM || 'vercel' }}"
+          TF_VAR_enable_durable_object_bindings: "${{ secrets.ENABLE_DURABLE_OBJECT_BINDINGS || 'true' }}"
           MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
           MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
 
