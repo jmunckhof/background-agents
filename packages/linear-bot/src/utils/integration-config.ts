@@ -4,12 +4,6 @@ import { createLogger } from "../logger";
 
 const log = createLogger("integration-config");
 
-export interface ResolvedStatusMapping {
-  inProgressStateName: string;
-  completedStateName: string;
-  cancelledStateName: string | null;
-}
-
 export interface ResolvedLinearConfig {
   model: string | null;
   reasoningEffort: string | null;
@@ -18,7 +12,6 @@ export interface ResolvedLinearConfig {
   emitToolProgressActivities: boolean;
   enabledRepos: string[] | null;
   updateIssueStatus: boolean;
-  statusMapping: ResolvedStatusMapping;
 }
 
 const DEFAULT_CONFIG: ResolvedLinearConfig = {
@@ -29,11 +22,6 @@ const DEFAULT_CONFIG: ResolvedLinearConfig = {
   emitToolProgressActivities: true,
   enabledRepos: null,
   updateIssueStatus: false,
-  statusMapping: {
-    inProgressStateName: "In Progress",
-    completedStateName: "In Review",
-    cancelledStateName: null,
-  },
 };
 
 export async function getLinearConfig(env: Env, repo: string): Promise<ResolvedLinearConfig> {

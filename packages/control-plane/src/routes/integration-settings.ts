@@ -335,11 +335,6 @@ async function handleGetResolvedConfig(
         emitToolProgressActivities: linearSettings.emitToolProgressActivities ?? true,
         enabledRepos,
         updateIssueStatus: linearSettings.updateIssueStatus ?? false,
-        statusMapping: {
-          inProgressStateName: linearSettings.statusMapping?.inProgressStateName ?? "In Progress",
-          completedStateName: linearSettings.statusMapping?.completedStateName ?? "In Review",
-          cancelledStateName: linearSettings.statusMapping?.cancelledStateName ?? null,
-        },
       },
     });
   }

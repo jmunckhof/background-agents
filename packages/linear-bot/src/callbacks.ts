@@ -14,9 +14,9 @@ import {
 import { extractAgentResponse, formatAgentResponse } from "./completion/extractor";
 import { timingSafeEqual } from "@open-inspect/shared";
 import { computeHmacHex } from "./utils/crypto";
-import { makePlan } from "./plan";
-import { getLinearConfig } from "./utils/integration-config";
+import { makePlan, todosToplan } from "./plan";
 import { transitionIssueStatus } from "./issue-status";
+import { getLinearConfig } from "./utils/integration-config";
 import { createLogger } from "./logger";
 
 const log = createLogger("callback");
@@ -96,20 +96,23 @@ callbacksRouter.post("/complete", async (c) => {
 
 // ─── Tool Call Callback ──────────────────────────────────────────────────────
 
-export function formatToolAction(tool: string, args: Record<string, unknown>): string {
+export function formatToolAction(
+  tool: string,
+  args: Record<string, unknown>
+): { action: string; parameter: string } {
   switch (tool) {
     case "edit_file":
     case "write_file":
-      return `Editing \`${args.filepath || args.path || "file"}\``;
+      return { action: "Editing", parameter: String(args.filepath || args.path || "file") };
     case "read_file":
-      return `Reading \`${args.filepath || args.path || "file"}\``;
+      return { action: "Reading", parameter: String(args.filepath || args.path || "file") };
     case "bash":
     case "execute_command": {
       const cmd = String(args.command || args.cmd || "");
-      return `Running \`${cmd.length > 80 ? cmd.slice(0, 77) + "..." : cmd}\``;
+      return { action: "Running", parameter: cmd.length > 80 ? cmd.slice(0, 77) + "..." : cmd };
     }
     default:
-      return `Using tool: ${tool}`;
+      return { action: tool, parameter: "" };
   }
 }
 
@@ -216,11 +219,29 @@ callbacksRouter.post("/tool_call", async (c) => {
       }
 
       try {
-        const description = formatToolAction(payload.tool, payload.args);
+        // Forward TodoWrite as Linear agent plan
+        if (payload.tool.toLowerCase() === "todowrite") {
+          const plan = todosToplan(payload.args);
+          if (plan) {
+            await updateAgentSession(client, context.agentSessionId, { plan });
+            log.info("callback.tool_call", {
+              trace_id: traceId,
+              session_id: payload.sessionId,
+              agent_session_id: context.agentSessionId,
+              tool: payload.tool,
+              outcome: "plan_updated",
+              plan_steps: plan.length,
+              duration_ms: Date.now() - processStart,
+            });
+            return;
+          }
+        }
+
+        const { action, parameter } = formatToolAction(payload.tool, payload.args);
         await emitAgentActivity(
           client,
           context.agentSessionId,
-          { type: "action", body: description },
+          { type: "action", action, parameter },
           true
         );
         log.info("callback.tool_call", {
@@ -301,7 +322,7 @@ async function handleCompletionCallback(
           await updateAgentSession(client, context.agentSessionId, { externalUrls: urls });
         }
 
-        // Transition issue to completed state
+        // Transition issue to completed on success (leave in started on failure for easy retry)
         if (payload.success && context.teamId) {
           const integrationConfig = await getLinearConfig(env, context.repoFullName.toLowerCase());
           await transitionIssueStatus(
@@ -310,7 +331,8 @@ async function handleCompletionCallback(
             context.issueId,
             context.teamId,
             "completed",
-            integrationConfig,
+            integrationConfig.updateIssueStatus,
+            null, // skip guard — completion always applies
             traceId
           );
         }

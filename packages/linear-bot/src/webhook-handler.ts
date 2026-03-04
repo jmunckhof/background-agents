@@ -35,7 +35,7 @@ import {
   lookupIssueSession,
   storeIssueSession,
 } from "./kv-store";
-import { transitionIssueStatus } from "./issue-status";
+import { transitionIssueStatus, setDelegateIfUnset } from "./issue-status";
 
 const log = createLogger("handler");
 
@@ -103,7 +103,8 @@ async function handleStop(webhook: AgentSessionWebhook, env: Env, traceId: strin
             issueId,
             teamId,
             "cancelled",
-            integrationConfig,
+            integrationConfig.updateIssueStatus,
+            null, // cancellation always applies, skip guard
             traceId
           );
         }
@@ -146,6 +147,9 @@ async function handleFollowUp(
   const existingSession = await lookupIssueSession(env, issue.id);
   if (!existingSession) return;
 
+  const repoFullName = `${existingSession.repoOwner}/${existingSession.repoName}`;
+  const integrationConfig = await getLinearConfig(env, repoFullName.toLowerCase());
+
   const followUpContent = agentActivity?.body || comment?.body || "Follow-up on the issue.";
 
   await emitAgentActivity(
@@ -156,6 +160,18 @@ async function handleFollowUp(
       body: "Processing follow-up message...",
     },
     true
+  );
+
+  // Transition issue back to "In Progress" since new work is starting
+  await transitionIssueStatus(
+    env,
+    client,
+    issue.id,
+    issue.team.id,
+    "inProgress",
+    integrationConfig.updateIssueStatus,
+    null, // follow-up should always go back to started
+    traceId
   );
 
   const headers = await getAuthHeaders(env, traceId);
@@ -181,6 +197,19 @@ async function handleFollowUp(
     /* best effort */
   }
 
+  const callbackContext: CallbackContext = {
+    source: "linear",
+    issueId: issue.id,
+    issueIdentifier: issue.identifier,
+    issueUrl: issue.url,
+    repoFullName,
+    model: existingSession.model,
+    agentSessionId,
+    organizationId: orgId,
+    emitToolProgressActivities: integrationConfig.emitToolProgressActivities,
+    teamId: issue.team.id,
+  };
+
   const promptRes = await env.CONTROL_PLANE.fetch(
     `https://internal/sessions/${existingSession.sessionId}/prompt`,
     {
@@ -190,6 +219,7 @@ async function handleFollowUp(
         content: `Follow-up on ${issue.identifier}:\n\n${followUpContent}${sessionContext}`,
         authorId: `linear:${webhook.appUserId}`,
         source: "linear",
+        callbackContext,
       }),
     }
   );
@@ -478,16 +508,18 @@ async function handleNewSession(
     plan: makePlan("session_created"),
   });
 
-  // Transition issue to "In Progress"
+  // Transition issue to "In Progress" and set bot as delegate
   await transitionIssueStatus(
     env,
     client,
     issue.id,
     issue.team.id,
     "inProgress",
-    integrationConfig,
+    integrationConfig.updateIssueStatus,
+    issueDetails?.stateType ?? null,
     traceId
   );
+  await setDelegateIfUnset(env, client, issue.id, issueDetails?.delegateId ?? null, traceId);
 
   // ─── Build and send prompt ────────────────────────────────────────────
 
