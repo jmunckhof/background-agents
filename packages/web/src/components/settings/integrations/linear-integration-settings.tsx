@@ -120,15 +120,6 @@ function GlobalSettingsSection({
   const [updateIssueStatus, setUpdateIssueStatus] = useState(
     settings?.defaults?.updateIssueStatus ?? false
   );
-  const [inProgressStateName, setInProgressStateName] = useState(
-    settings?.defaults?.statusMapping?.inProgressStateName ?? "In Progress"
-  );
-  const [completedStateName, setCompletedStateName] = useState(
-    settings?.defaults?.statusMapping?.completedStateName ?? "In Review"
-  );
-  const [cancelledStateName, setCancelledStateName] = useState(
-    settings?.defaults?.statusMapping?.cancelledStateName ?? ""
-  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -146,11 +137,6 @@ function GlobalSettingsSection({
         setAllowLabelModelOverride(settings.defaults?.allowLabelModelOverride ?? true);
         setEmitToolProgressActivities(settings.defaults?.emitToolProgressActivities ?? true);
         setUpdateIssueStatus(settings.defaults?.updateIssueStatus ?? false);
-        setInProgressStateName(
-          settings.defaults?.statusMapping?.inProgressStateName ?? "In Progress"
-        );
-        setCompletedStateName(settings.defaults?.statusMapping?.completedStateName ?? "In Review");
-        setCancelledStateName(settings.defaults?.statusMapping?.cancelledStateName ?? "");
       }
       setInitialized(true);
     }
@@ -184,9 +170,6 @@ function GlobalSettingsSection({
         setAllowLabelModelOverride(true);
         setEmitToolProgressActivities(true);
         setUpdateIssueStatus(false);
-        setInProgressStateName("In Progress");
-        setCompletedStateName("In Review");
-        setCancelledStateName("");
         setDirty(false);
         setSuccess("Settings reset to defaults.");
       } else {
@@ -211,14 +194,6 @@ function GlobalSettingsSection({
       emitToolProgressActivities,
       updateIssueStatus,
     };
-
-    if (updateIssueStatus) {
-      defaults.statusMapping = {
-        inProgressStateName: inProgressStateName || "In Progress",
-        completedStateName: completedStateName || "In Review",
-        cancelledStateName: cancelledStateName || null,
-      };
-    }
 
     if (model) defaults.model = model;
     if (effort) defaults.reasoningEffort = effort;
@@ -385,41 +360,6 @@ function GlobalSettingsSection({
             className="rounded border-border"
           />
         </label>
-
-        {updateIssueStatus && (
-          <div className="space-y-2">
-            <StatusMappingRow
-              label="In Progress"
-              value={inProgressStateName}
-              onChange={(v) => {
-                setInProgressStateName(v);
-                setDirty(true);
-                setError("");
-                setSuccess("");
-              }}
-            />
-            <StatusMappingRow
-              label="Completed"
-              value={completedStateName}
-              onChange={(v) => {
-                setCompletedStateName(v);
-                setDirty(true);
-                setError("");
-                setSuccess("");
-              }}
-            />
-            <StatusMappingRow
-              label="Cancelled"
-              value={cancelledStateName}
-              onChange={(v) => {
-                setCancelledStateName(v);
-                setDirty(true);
-                setError("");
-                setSuccess("");
-              }}
-            />
-          </div>
-        )}
       </div>
 
       <div className="mb-4">
@@ -618,15 +558,6 @@ function RepoOverrideRow({
   const [updateIssueStatus, setUpdateIssueStatus] = useState(
     entry.settings.updateIssueStatus ?? false
   );
-  const [inProgressStateName, setInProgressStateName] = useState(
-    entry.settings.statusMapping?.inProgressStateName ?? "In Progress"
-  );
-  const [completedStateName, setCompletedStateName] = useState(
-    entry.settings.statusMapping?.completedStateName ?? "In Review"
-  );
-  const [cancelledStateName, setCancelledStateName] = useState(
-    entry.settings.statusMapping?.cancelledStateName ?? ""
-  );
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
@@ -653,13 +584,6 @@ function RepoOverrideRow({
       emitToolProgressActivities,
       updateIssueStatus,
     };
-    if (updateIssueStatus) {
-      settings.statusMapping = {
-        inProgressStateName: inProgressStateName || "In Progress",
-        completedStateName: completedStateName || "In Review",
-        cancelledStateName: cancelledStateName || null,
-      };
-    }
     if (model) settings.model = model;
     if (effort) settings.reasoningEffort = effort;
 
@@ -796,38 +720,6 @@ function RepoOverrideRow({
         />
       </label>
 
-      {updateIssueStatus && (
-        <div className="space-y-2">
-          <StatusMappingRow
-            label="In Progress"
-            value={inProgressStateName}
-            density="compact"
-            onChange={(v) => {
-              setInProgressStateName(v);
-              setDirty(true);
-            }}
-          />
-          <StatusMappingRow
-            label="Completed"
-            value={completedStateName}
-            density="compact"
-            onChange={(v) => {
-              setCompletedStateName(v);
-              setDirty(true);
-            }}
-          />
-          <StatusMappingRow
-            label="Cancelled"
-            value={cancelledStateName}
-            density="compact"
-            onChange={(v) => {
-              setCancelledStateName(v);
-              setDirty(true);
-            }}
-          />
-        </div>
-      )}
-
       <div className="flex items-center gap-2">
         <Button size="sm" onClick={handleSave} disabled={saving || !dirty}>
           {saving ? "..." : "Save"}
@@ -858,51 +750,6 @@ function Section({
       <p className="text-sm text-muted-foreground mb-4">{description}</p>
       {children}
     </section>
-  );
-}
-
-const LINEAR_STATE_OPTIONS = [
-  "Triage",
-  "Backlog",
-  "Todo",
-  "In Progress",
-  "In Review",
-  "Done",
-  "Cancelled",
-];
-
-function StatusMappingRow({
-  label,
-  value,
-  onChange,
-  density,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  density?: "compact";
-}) {
-  const py = density === "compact" ? "py-1" : "py-2";
-
-  return (
-    <div
-      className={`flex items-center justify-between gap-3 px-3 ${py} border border-border rounded-sm text-sm`}
-    >
-      <span className="text-foreground font-medium shrink-0">{label}</span>
-      <Select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        density={density ?? "default"}
-        className="w-48"
-      >
-        <option value="">Don&apos;t update</option>
-        {LINEAR_STATE_OPTIONS.map((name) => (
-          <option key={name} value={name}>
-            {name}
-          </option>
-        ))}
-      </Select>
-    </div>
   );
 }
 

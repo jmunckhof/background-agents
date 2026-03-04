@@ -29,3 +29,24 @@ export function makePlan(
   const statuses = statusMap[stage];
   return steps.map((content, i) => ({ content, status: statuses[i] }));
 }
+
+/** Map TodoWrite status values to Linear PlanStepStatus. */
+const TODO_STATUS_MAP: Record<string, PlanStepStatus> = {
+  pending: "pending",
+  in_progress: "inProgress",
+  completed: "completed",
+};
+
+/**
+ * Convert a TodoWrite tool call's args into Linear plan steps.
+ * Returns null if the args don't contain a valid todos array.
+ */
+export function todosToplan(args: Record<string, unknown>): PlanStep[] | null {
+  const todos = args.todos;
+  if (!Array.isArray(todos) || todos.length === 0) return null;
+
+  return todos.map((todo: { content?: string; status?: string }) => ({
+    content: String(todo.content ?? ""),
+    status: TODO_STATUS_MAP[String(todo.status ?? "pending")] ?? "pending",
+  }));
+}

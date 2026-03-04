@@ -205,6 +205,8 @@ export async function fetchIssueDetails(
           labels { nodes { id name } }
           project { id name }
           assignee { id name }
+          state { type }
+          delegate { id }
           team { id key name }
           comments(first: 10, orderBy: createdAt) {
             nodes {
@@ -233,6 +235,8 @@ export async function fetchIssueDetails(
       project: issue.project as { id: string; name: string } | null,
       assignee: issue.assignee as { id: string; name: string } | null,
       team: issue.team as { id: string; key: string; name: string },
+      stateType: (issue.state as { type?: string } | null)?.type ?? null,
+      delegateId: (issue.delegate as { id?: string } | null)?.id ?? null,
       comments:
         (issue.comments as { nodes: Array<{ body: string; user?: { name: string } }> })?.nodes ||
         [],
@@ -328,6 +332,7 @@ export interface WorkflowState {
   id: string;
   name: string;
   type: string; // "triage" | "backlog" | "unstarted" | "started" | "completed" | "canceled"
+  position: number;
 }
 
 /**
@@ -343,7 +348,7 @@ export async function fetchTeamWorkflowStates(
       `
       query TeamWorkflowStates($teamId: String!) {
         team(id: $teamId) {
-          states { nodes { id name type } }
+          states { nodes { id name type position } }
         }
       }
     `,
@@ -391,6 +396,55 @@ export async function updateIssueState(
       error: err instanceof Error ? err : new Error(String(err)),
     });
     return false;
+  }
+}
+
+/**
+ * Set the delegate (assignee-like agent ownership) on a Linear issue.
+ */
+export async function setIssueDelegate(
+  client: LinearApiClient,
+  issueId: string,
+  delegateId: string
+): Promise<boolean> {
+  try {
+    const data = await linearGraphQL(
+      client,
+      `
+      mutation IssueUpdate($id: String!, $input: IssueUpdateInput!) {
+        issueUpdate(id: $id, input: $input) {
+          success
+        }
+      }
+    `,
+      { id: issueId, input: { delegateId } }
+    );
+
+    const result = (data as { data?: { issueUpdate?: { success: boolean } } }).data?.issueUpdate;
+    return result?.success ?? false;
+  } catch (err) {
+    log.error("linear.set_delegate", {
+      issue_id: issueId,
+      delegate_id: delegateId,
+      error: err instanceof Error ? err : new Error(String(err)),
+    });
+    return false;
+  }
+}
+
+/**
+ * Fetch the bot's own actor ID via the viewer query.
+ */
+export async function fetchBotActorId(client: LinearApiClient): Promise<string | null> {
+  try {
+    const data = await linearGraphQL(client, `query { viewer { id } }`, {});
+    const viewer = (data as { data?: { viewer?: { id: string } } }).data?.viewer;
+    return viewer?.id ?? null;
+  } catch (err) {
+    log.error("linear.fetch_bot_actor_id", {
+      error: err instanceof Error ? err : new Error(String(err)),
+    });
+    return null;
   }
 }
 

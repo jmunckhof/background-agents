@@ -172,6 +172,8 @@ export interface LinearIssueDetails {
   project?: { id: string; name: string } | null;
   assignee?: { id: string; name: string } | null;
   team: { id: string; key: string; name: string };
+  stateType: string | null;
+  delegateId: string | null;
   comments: Array<{ body: string; user?: { name: string } }>;
 }
 

@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { resolveStateId, transitionIssueStatus } from "./issue-status";
+import {
+  resolveLowestPositionState,
+  transitionIssueStatus,
+  setDelegateIfUnset,
+} from "./issue-status";
 import type { WorkflowState } from "./utils/linear-client";
-import type { ResolvedLinearConfig } from "./utils/integration-config";
 import type { Env } from "./types";
 
 // ─── Fake KVNamespace ────────────────────────────────────────────────────────
@@ -30,65 +33,54 @@ function createFakeKV(initial: Record<string, string> = {}) {
 // ─── Test data ───────────────────────────────────────────────────────────────
 
 const STATES: WorkflowState[] = [
-  { id: "state-1", name: "Backlog", type: "backlog" },
-  { id: "state-2", name: "Todo", type: "unstarted" },
-  { id: "state-3", name: "In Progress", type: "started" },
-  { id: "state-4", name: "In Review", type: "completed" },
-  { id: "state-5", name: "Done", type: "completed" },
-  { id: "state-6", name: "Cancelled", type: "canceled" },
+  { id: "state-1", name: "Backlog", type: "backlog", position: 0 },
+  { id: "state-2", name: "Todo", type: "unstarted", position: 1 },
+  { id: "state-3", name: "In Progress", type: "started", position: 2 },
+  { id: "state-4", name: "In Review", type: "started", position: 3 },
+  { id: "state-5", name: "Done", type: "completed", position: 0 },
+  { id: "state-6", name: "Deployed", type: "completed", position: 1 },
+  { id: "state-7", name: "Cancelled", type: "canceled", position: 0 },
 ];
 
-function makeConfig(overrides: Partial<ResolvedLinearConfig> = {}): ResolvedLinearConfig {
-  return {
-    model: null,
-    reasoningEffort: null,
-    allowUserPreferenceOverride: true,
-    allowLabelModelOverride: true,
-    emitToolProgressActivities: true,
-    enabledRepos: null,
-    updateIssueStatus: true,
-    statusMapping: {
-      inProgressStateName: "In Progress",
-      completedStateName: "In Review",
-      cancelledStateName: null,
-    },
-    ...overrides,
-  };
-}
+// ─── resolveLowestPositionState ─────────────────────────────────────────────
 
-// ─── resolveStateId ──────────────────────────────────────────────────────────
-
-describe("resolveStateId", () => {
-  it("finds exact name match", () => {
-    expect(resolveStateId(STATES, "In Progress", "inProgress")).toBe("state-3");
+describe("resolveLowestPositionState", () => {
+  it("returns the state with lowest position for the target type", () => {
+    const result = resolveLowestPositionState(STATES, "started");
+    expect(result).toEqual({ id: "state-3", name: "In Progress", type: "started", position: 2 });
   });
 
-  it("matches case-insensitively", () => {
-    expect(resolveStateId(STATES, "in progress", "inProgress")).toBe("state-3");
-    expect(resolveStateId(STATES, "IN REVIEW", "completed")).toBe("state-4");
+  it("returns lowest position for completed type", () => {
+    const result = resolveLowestPositionState(STATES, "completed");
+    expect(result).toEqual({ id: "state-5", name: "Done", type: "completed", position: 0 });
   });
 
-  it("falls back to WorkflowStateType when name does not match", () => {
-    // "Working" doesn't match any name, but "started" type matches "In Progress"
-    expect(resolveStateId(STATES, "Working", "inProgress")).toBe("state-3");
-  });
-
-  it("falls back to type for completed", () => {
-    // "Shipped" doesn't match any name, but "completed" type matches "In Review" (first match)
-    expect(resolveStateId(STATES, "Shipped", "completed")).toBe("state-4");
-  });
-
-  it("falls back to type for cancelled", () => {
-    expect(resolveStateId(STATES, "Abandoned", "cancelled")).toBe("state-6");
-  });
-
-  it("returns null when neither name nor type match", () => {
+  it("returns null when no states match the type", () => {
     const statesWithoutCanceled = STATES.filter((s) => s.type !== "canceled");
-    expect(resolveStateId(statesWithoutCanceled, "Abandoned", "cancelled")).toBeNull();
+    expect(resolveLowestPositionState(statesWithoutCanceled, "canceled")).toBeNull();
   });
 
   it("returns null for empty states array", () => {
-    expect(resolveStateId([], "In Progress", "inProgress")).toBeNull();
+    expect(resolveLowestPositionState([], "started")).toBeNull();
+  });
+
+  it("handles states without position (backward compat)", () => {
+    const legacyStates = [
+      { id: "s1", name: "A", type: "started" },
+      { id: "s2", name: "B", type: "started", position: 1 },
+    ] as WorkflowState[];
+    // s1 has no position → treated as Infinity, s2 wins
+    const result = resolveLowestPositionState(legacyStates, "started");
+    expect(result?.id).toBe("s2");
+  });
+
+  it("picks first when all positions equal", () => {
+    const samePos = [
+      { id: "s1", name: "A", type: "started", position: 5 },
+      { id: "s2", name: "B", type: "started", position: 5 },
+    ];
+    const result = resolveLowestPositionState(samePos, "started");
+    expect(result?.id).toBe("s1");
   });
 });
 
@@ -98,12 +90,21 @@ describe("resolveStateId", () => {
 vi.mock("./utils/linear-client", () => ({
   fetchTeamWorkflowStates: vi.fn(async () => STATES),
   updateIssueState: vi.fn(async () => true),
+  setIssueDelegate: vi.fn(async () => true),
+  fetchBotActorId: vi.fn(async () => "bot-actor-123"),
 }));
 
-import { fetchTeamWorkflowStates, updateIssueState } from "./utils/linear-client";
+import {
+  fetchTeamWorkflowStates,
+  updateIssueState,
+  setIssueDelegate,
+  fetchBotActorId,
+} from "./utils/linear-client";
 
 const mockedFetchStates = vi.mocked(fetchTeamWorkflowStates);
 const mockedUpdateState = vi.mocked(updateIssueState);
+const mockedSetDelegate = vi.mocked(setIssueDelegate);
+const mockedFetchBotActorId = vi.mocked(fetchBotActorId);
 
 describe("transitionIssueStatus", () => {
   const client = { accessToken: "test-token" };
@@ -120,64 +121,156 @@ describe("transitionIssueStatus", () => {
   });
 
   it("is a no-op when updateIssueStatus is false", async () => {
-    const config = makeConfig({ updateIssueStatus: false });
-    await transitionIssueStatus(makeEnv(), client, issueId, teamId, "inProgress", config);
+    await transitionIssueStatus(makeEnv(), client, issueId, teamId, "inProgress", false, null);
     expect(mockedFetchStates).not.toHaveBeenCalled();
     expect(mockedUpdateState).not.toHaveBeenCalled();
   });
 
-  it("is a no-op when cancelledStateName is null", async () => {
-    const config = makeConfig({
-      statusMapping: {
-        inProgressStateName: "In Progress",
-        completedStateName: "In Review",
-        cancelledStateName: null,
-      },
-    });
-    await transitionIssueStatus(makeEnv(), client, issueId, teamId, "cancelled", config);
-    expect(mockedFetchStates).not.toHaveBeenCalled();
-    expect(mockedUpdateState).not.toHaveBeenCalled();
-  });
-
-  it("calls updateIssueState with resolved state ID for inProgress", async () => {
-    const config = makeConfig();
-    await transitionIssueStatus(makeEnv(), client, issueId, teamId, "inProgress", config);
+  it("calls updateIssueState with lowest-position state for inProgress", async () => {
+    await transitionIssueStatus(makeEnv(), client, issueId, teamId, "inProgress", true, null);
     expect(mockedFetchStates).toHaveBeenCalledWith(client, teamId);
+    // "In Progress" has position 2, lowest among "started" type
     expect(mockedUpdateState).toHaveBeenCalledWith(client, issueId, "state-3");
   });
 
-  it("calls updateIssueState with resolved state ID for completed", async () => {
-    const config = makeConfig();
-    await transitionIssueStatus(makeEnv(), client, issueId, teamId, "completed", config);
-    expect(mockedUpdateState).toHaveBeenCalledWith(client, issueId, "state-4");
+  it("calls updateIssueState with lowest-position state for completed", async () => {
+    await transitionIssueStatus(makeEnv(), client, issueId, teamId, "completed", true, null);
+    // "Done" has position 0, lowest among "completed" type
+    expect(mockedUpdateState).toHaveBeenCalledWith(client, issueId, "state-5");
+  });
+
+  it("calls updateIssueState with lowest-position state for cancelled", async () => {
+    await transitionIssueStatus(makeEnv(), client, issueId, teamId, "cancelled", true, null);
+    expect(mockedUpdateState).toHaveBeenCalledWith(client, issueId, "state-7");
   });
 
   it("uses cached states from KV on second call", async () => {
     const env = makeEnv();
-    const config = makeConfig();
 
-    await transitionIssueStatus(env, client, issueId, teamId, "inProgress", config);
+    await transitionIssueStatus(env, client, issueId, teamId, "inProgress", true, null);
     expect(mockedFetchStates).toHaveBeenCalledTimes(1);
 
     // Second call should use cached states
-    await transitionIssueStatus(env, client, issueId, teamId, "completed", config);
+    await transitionIssueStatus(env, client, issueId, teamId, "cancelled", true, null);
     expect(mockedFetchStates).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not call updateIssueState when state cannot be resolved", async () => {
-    mockedFetchStates.mockResolvedValueOnce([{ id: "state-1", name: "Backlog", type: "backlog" }]);
-    const config = makeConfig();
-    const env = makeEnv();
-
-    await transitionIssueStatus(env, client, issueId, teamId, "inProgress", config);
-    expect(mockedUpdateState).not.toHaveBeenCalled();
   });
 
   it("does not call updateIssueState when no states returned", async () => {
     mockedFetchStates.mockResolvedValueOnce([]);
-    const config = makeConfig();
-
-    await transitionIssueStatus(makeEnv(), client, issueId, teamId, "inProgress", config);
+    await transitionIssueStatus(makeEnv(), client, issueId, teamId, "inProgress", true, null);
     expect(mockedUpdateState).not.toHaveBeenCalled();
+  });
+
+  it("does not call updateIssueState when target type not found", async () => {
+    mockedFetchStates.mockResolvedValueOnce([
+      { id: "state-1", name: "Backlog", type: "backlog", position: 0 },
+    ]);
+    await transitionIssueStatus(makeEnv(), client, issueId, teamId, "inProgress", true, null);
+    expect(mockedUpdateState).not.toHaveBeenCalled();
+  });
+
+  // ─── State guard tests ───────────────────────────────────────────────────
+
+  it("skips inProgress when current state is already started", async () => {
+    await transitionIssueStatus(makeEnv(), client, issueId, teamId, "inProgress", true, "started");
+    expect(mockedFetchStates).not.toHaveBeenCalled();
+    expect(mockedUpdateState).not.toHaveBeenCalled();
+  });
+
+  it("skips inProgress when current state is completed", async () => {
+    await transitionIssueStatus(
+      makeEnv(),
+      client,
+      issueId,
+      teamId,
+      "inProgress",
+      true,
+      "completed"
+    );
+    expect(mockedUpdateState).not.toHaveBeenCalled();
+  });
+
+  it("skips inProgress when current state is canceled", async () => {
+    await transitionIssueStatus(makeEnv(), client, issueId, teamId, "inProgress", true, "canceled");
+    expect(mockedUpdateState).not.toHaveBeenCalled();
+  });
+
+  it("allows inProgress when current state is unstarted", async () => {
+    await transitionIssueStatus(
+      makeEnv(),
+      client,
+      issueId,
+      teamId,
+      "inProgress",
+      true,
+      "unstarted"
+    );
+    expect(mockedUpdateState).toHaveBeenCalledWith(client, issueId, "state-3");
+  });
+
+  it("allows inProgress when currentStateType is null (unknown)", async () => {
+    await transitionIssueStatus(makeEnv(), client, issueId, teamId, "inProgress", true, null);
+    expect(mockedUpdateState).toHaveBeenCalledWith(client, issueId, "state-3");
+  });
+
+  it("always allows cancelled regardless of current state", async () => {
+    await transitionIssueStatus(makeEnv(), client, issueId, teamId, "cancelled", true, "started");
+    expect(mockedUpdateState).toHaveBeenCalledWith(client, issueId, "state-7");
+  });
+});
+
+// ─── setDelegateIfUnset ─────────────────────────────────────────────────────
+
+describe("setDelegateIfUnset", () => {
+  const client = { accessToken: "test-token" };
+  const issueId = "issue-1";
+
+  function makeEnv(kvInitial: Record<string, string> = {}): Env {
+    const { kv } = createFakeKV(kvInitial);
+    return { LINEAR_KV: kv } as unknown as Env;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sets delegate when not already set", async () => {
+    await setDelegateIfUnset(makeEnv(), client, issueId, null);
+    expect(mockedFetchBotActorId).toHaveBeenCalledWith(client);
+    expect(mockedSetDelegate).toHaveBeenCalledWith(client, issueId, "bot-actor-123");
+  });
+
+  it("skips when delegate is already set", async () => {
+    await setDelegateIfUnset(makeEnv(), client, issueId, "existing-delegate");
+    expect(mockedFetchBotActorId).not.toHaveBeenCalled();
+    expect(mockedSetDelegate).not.toHaveBeenCalled();
+  });
+
+  it("uses cached bot actor ID from KV", async () => {
+    const env = makeEnv({ "cache:bot-actor-id": "cached-bot-id" });
+    await setDelegateIfUnset(env, client, issueId, null);
+    expect(mockedFetchBotActorId).not.toHaveBeenCalled();
+    expect(mockedSetDelegate).toHaveBeenCalledWith(client, issueId, "cached-bot-id");
+  });
+
+  it("caches bot actor ID after first fetch", async () => {
+    const env = makeEnv();
+    await setDelegateIfUnset(env, client, issueId, null);
+    expect(mockedFetchBotActorId).toHaveBeenCalledTimes(1);
+
+    // Reset delegate mock to check second call
+    mockedSetDelegate.mockClear();
+    mockedFetchBotActorId.mockClear();
+
+    // Remove delegate so it tries again
+    await setDelegateIfUnset(env, client, "issue-2", null);
+    expect(mockedFetchBotActorId).not.toHaveBeenCalled();
+    expect(mockedSetDelegate).toHaveBeenCalledWith(client, "issue-2", "bot-actor-123");
+  });
+
+  it("does nothing when bot actor ID cannot be fetched", async () => {
+    mockedFetchBotActorId.mockResolvedValueOnce(null);
+    await setDelegateIfUnset(makeEnv(), client, issueId, null);
+    expect(mockedSetDelegate).not.toHaveBeenCalled();
   });
 });

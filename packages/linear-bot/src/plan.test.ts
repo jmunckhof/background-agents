@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { makePlan } from "./plan";
+import { makePlan, todosToplan } from "./plan";
 
 const EXPECTED_CONTENT = [
   "Analyze issue",
@@ -39,5 +39,33 @@ describe("makePlan", () => {
   it("failed → first 4 completed, last canceled", () => {
     const statuses = makePlan("failed").map((s) => s.status);
     expect(statuses).toEqual(["completed", "completed", "completed", "completed", "canceled"]);
+  });
+});
+
+describe("todosToplan", () => {
+  it("converts TodoWrite args to Linear plan steps", () => {
+    const result = todosToplan({
+      todos: [
+        { content: "Fix bug", status: "completed" },
+        { content: "Write tests", status: "in_progress" },
+        { content: "Update docs", status: "pending" },
+      ],
+    });
+    expect(result).toEqual([
+      { content: "Fix bug", status: "completed" },
+      { content: "Write tests", status: "inProgress" },
+      { content: "Update docs", status: "pending" },
+    ]);
+  });
+
+  it("returns null for missing todos", () => {
+    expect(todosToplan({})).toBeNull();
+    expect(todosToplan({ todos: [] })).toBeNull();
+    expect(todosToplan({ todos: "not an array" })).toBeNull();
+  });
+
+  it("defaults unknown status to pending", () => {
+    const result = todosToplan({ todos: [{ content: "Task", status: "unknown" }] });
+    expect(result).toEqual([{ content: "Task", status: "pending" }]);
   });
 });
